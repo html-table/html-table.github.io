@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>html-table Web Component</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg style=&quot;width:100%;display:inline-block&quot; xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><path class=&quot;hexedpath&quot; d=&quot;M48 3l45 23v45l-45 22l-45-22v-45z&quot; stroke=&quot;gold&quot; stroke-width=&quot;6&quot; fill='darkgoldenrod' stroke-linejoin='round'/><text stroke='black' fill='gold' stroke-width='0.1' x='47' y='70'  font-size='60px' style='user-select:none' font-family='Verdana' text-anchor='middle' font-weight='bold'  >T</text></svg>"
+    />
+    <meta name="title" property="og:title" content="html-table Web Component" />
+    <meta
+      name="description"
+      property="og:description"
+      content="html-table Web Component with paging/grouping/filters/search"
+    />
+    <meta name="url" property="og:url" content="https://html-table.github.io" />
+    <!-- <meta name="image" property="og:image" content="linkedin_hexedland.png" /> -->
+    <meta
+      name="viewport"
+      property="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+
+    <script defer="" src="./element.js"></script>
+  </head>
+  <body>
+    <template id="HTML-TABLE-STYLE">
+      <style>
+        table {
+            font:var(--tableFont,12px arial);
+          xwidth: 100%;
+          max-width: 100%;
+          cursor: pointer;
+          xborder-collapse: collapse;
+          --tableBackground: slategray;
+          --tableHeadBackground: var(--tableBackground);
+          --hoverColor: darkgray;
+          --selectedColor: lightgreen;
+          --filterColor: lightgreen;
+          border-spacing: 1px 0;
+          background: var(--tableBackground, darkgrey);
+        }
+        tfoot {
+          /*
+             contents - full width
+             table-caption: top-left above table
+             none - hidden
+            */
+          display: var(--footerDisplay, contents);
+          user-select: none;
+        }
+
+        th select {
+          display: var(--filterDisplay, unset);
+        }
+        option {
+          cursor: pointer;
+        }
+        th[data-isnumber="true"] option {
+          text-align: right;
+        }
+        tr td {
+          /* nested tfoot hidden*/
+          --footerDisplay: none;
+          --filterDisplay: none;
+        }
+        thead {
+          background: var(
+            --tableHeadBackground,
+            var(--tableBackground, slategray)
+          );
+          color: var(--tableHeadColor, beige);
+        }
+        thead th {
+          /* so drag width DIV is positioned absolute */
+          position: relative;
+        }
+        thead select {
+          font-size: 12px;
+          xdisplay: none;
+        }
+
+        optgroup[label*="¥"] {
+          color: red;
+        }
+
+        th[data-colname="sel"] {
+          text-align: center;
+          width: 2em;
+        }
+        tbody td:not([data-colname="sel"]) {
+          padding: 0 0.3em;
+          max-width: 150px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        td[is-table] {
+          vertical-align: top;
+          padding: 0 !important;
+        }
+        td[is-table] table {
+            /* table IN table */
+          width: 100% !important;
+        }
+
+        .columnfilter {
+          width: 100%;
+        }
+
+        tbody tr:nth-child(even) {
+          background-color: ivory;
+        }
+
+        tbody tr:nth-child(odd) {
+          background-color: bisque;
+        }
+        th [data-sort]::after {
+          position: absolute;
+          content: attr(data-sort);
+          font-weight: bold;
+          color: black;
+        }
+
+        td[data-isnumber="true"] {
+          text-align: right;
+        }
+        #pager {
+          text-align: right;
+        }
+
+        #pager select {
+          width: 4em;
+          border: 0;
+          vertical-align: top;
+          margin-top: 3px;
+        }
+
+        #pager b {
+          font-size: 160%;
+          line-height: 75%;
+        }
+
+        #pager b:hover {
+          color: white;
+        }
+        tbody tr:hover {
+          background: var(--hoverColor, darkgrey) !important;
+        }
+
+        tbody tr.selected:hover {
+          background: green;
+          color: white;
+        }
+      </style>
+    </template>
+    <html-table
+      timers
+      id="MYTABLE"
+      forR="R"
+      for1="https://spreadsheets.google.com/feeds/list/15VqF0EBeBe3ahC92Laq0rp2bgbZBd9abR56XbzBwdJo/od6/public/values?alt=json"
+      for2="https://spreadsheets.google.com/feeds/list/1PtHV1xkRFAgi7T7TdeKy8yJV9yhEvyNYYUwESGM7Tp8/od6/public/values?alt=json"
+      for="https://api.publicapis.org/entries"
+      for1="https://restcountries.eu/rest/v2/all"
+      json="json/entries"
+      filter="o"
+      headerrow1="1"
+      sort="jaar1"
+      pagesizes="5,10,20,30,40"
+      pagesize="5"
+      xxxrownr="3"
+    >
+      <template id="columns">
+        <currencies>${value}</currencies>
+        <column name="API width="">
+          <a href="${Link}">${value}</a>
+        </column>
+        <column name="Description">
+          <a href="${Link}">${value}</a>
+        </column>
+        <column name="Link" hidden> </column>
+        <name> ${rownr} <i data-${name}="${value}">${value}</i> </name>
+        <druk>
+          <b>${value} (${colindex}) ${rownr} ${total}</b>
+        </druk>
+      </template>
+      <style shadowRoot>
+        [data-colname="currencies"] {
+          xwidth: 30vw;
+        }
+
+        td[data-colname="sort"] {
+          font-size: 80%;
+        }
+
+        [data-colindex="2"] {
+          background: rgb(128, 128, 128, 0.5);
+        }
+
+        [data-colname="titel"] {
+          width: 250px;
+        }
+        [data-colname="Description"],
+        [data-colname="Link"] {
+          display:none;
+        }
+
+        .selected {
+          xbackground: var(--selectedColor, lightgreen);
+        }
+
+        [data-colindex="18"],
+        [data-colindex="17"],
+        [data-colindex="15"],
+        [data-colindex="14"],
+        [data-colindex="13"],
+        [data-colindex="12"],
+        [data-colindex="11"],
+        [data-colindex="10"],
+        [data-colindex="9"],
+        [data-colindex="7"],
+        [data-colindex="5"],
+        [data-colindex="4"],
+        [data-colindex="2"] {
+          display: none;
+        }
+      </style>
+    </html-table>
+    <template id="T">
+      [{ "todo":"Learn React (or any other Framework or Component BaseClass)",
+      "done":false },{ "todo":"Two", "done":false },{ "todo":"Three",
+      "done":false }]
+    </template>
+  </body>
+</html>
