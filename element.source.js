@@ -1,6 +1,8 @@
 //TODO
+// paging make work
 // hide Link hidden column
 // set column width with width on <column>
+// specify lines to ignore (header rows)
 // vertical table (2 column list) like from beers API
 // Nested table details/summary: https://baseweb.design/components/table-grid/
 //DOING
@@ -8,7 +10,6 @@
 // select red filter: undo all other filters
 // when groupby set select size to only show one red item
 // ctrl click on cell value as filter on that value?
-// make sorting work
 //DONE
 // select all shouldn't color select
 // color grouped selects
@@ -17,9 +18,56 @@
 //https://ivosdc.github.io/svelte-generic-crud-table/?ref=madewithsvelte.com
 //https://jsonmatic.com/
 console.clear();
-function log() {
-  console.log("%c - ", "background:red;color:white", ...arguments);
-}
+
+const GoogleAPIversion = "v4";
+const GoogleAPIversionV4 = GoogleAPIversion == "v4";
+
+console.do = (...args) => {
+  console.log(
+    `%c ${typeof args[0] == "string" ? args.shift() : ""} `,
+    `background:purple;color:gold`,
+    ...args
+  );
+};
+
+/*
+  <google-sheet>
+  attributes:
+    sheetid - sheetid of PUBLISHED spreadsheet
+    sheettab - tabname
+    apikey - public Google API key
+
+    Load JSON data, convert to Array, store in own memory
+    respond to Event, return array
+*/
+customElements.define(
+  "google-sheet",
+  class extends HTMLElement {
+    constructor() {
+      this._headers = false;
+      this._rows = false;
+    }
+    connectedCallback() {
+      document.addEventListener("alldata", this.respond);
+      document.addEventListener(this.id, this.respond);
+      //fetch and create data
+    }
+    get rows() {
+      return this._rows;
+    }
+    set rows(rowsarray) {
+      this._rows = [...rowsarray];
+    }
+    respond(evt) {
+      let callbackFunc = evt.detail?.callback;
+      if (this._rows && callbackFunc) callbackFunc(this);
+    }
+  }
+);
+
+/*
+  <html-table>
+*/
 customElements.define(
   "html-table",
   class extends HTMLElement {
@@ -49,7 +97,7 @@ customElements.define(
       let timersthis = this;
       console.timers = new Proxy([{ label: "start", time: 0, duration: 0 }], {
         set(arr, prop, label) {
-          //console.error(prop,label);
+          //console.log(prop,label);
           if (!timersthis.hasAttribute("timers")) return true;
           if (prop != "length") {
             label = String(label);
@@ -65,6 +113,48 @@ customElements.define(
           return true;
         },
       });
+      this.json1 = [
+        {
+          naam: "Danny",
+          age: 52,
+          gender: "Male",
+        },
+        {
+          naam: "Marcel",
+          age: 49,
+          gender: "Male",
+        },
+        {
+          naam: "Diny",
+          age: 76,
+          gender: "Female",
+        },
+        {
+          naam: "Kees",
+          age: 77,
+          gender: "Male",
+        },
+        {
+          naam: "Cecile",
+          age: 59,
+          gender: "Female",
+        },
+        {
+          naam: "Natascha",
+          age: 48,
+          gender: "Female",
+        },
+        {
+          naam: "Finn",
+          age: 17,
+          gender: "Male",
+        },
+        {
+          naam: "Kiki",
+          age: 15,
+          gender: "Female",
+        },
+      ];
       if (this.json) {
         this.load(this.json);
         return;
@@ -73,90 +163,108 @@ customElements.define(
         this.for = this.getAttribute("for");
         this.shadowRoot.append(...this.querySelectorAll("[shadowRoot]"));
         if (this.for) {
-          if (this.for.startsWith("http")) {
-            let response = await (await fetch(this.for)).json();
-            console.timers.push("loaded JSON");
-            let headerRow = this.getAttribute("headerrow") || 0;
-            let isGoogle = this.for.includes("google");
-            // find first property which is an array
-            let rows = response;
-            if (isGoogle) rows = response.feed.entry;
-            this.headers = {};
-            // find first property being an Array
-            if (!Array.isArray(rows)) {
-              rows = [...Object.entries(rows)].reduce(
-                (rowACC, [key, value]) => {
-                  if (!Array.isArray(rowACC) && Array.isArray(value))
-                    return value;
-                  else return rowACC;
-                },
-                rows
-              );
-            }
-            if (!Array.isArray(rows)) {
-              console.error(
-                "%c No array found in response ",
-                "background:red;color:beige",
-                response
-              );
-              return;
-            }
-            console.log(
-              "%c parsed response to rows ",
-              "background:purple;color:gold",
-              {
-                response,
-                rows,
-                headers: this.headers,
-              }
-            );
+          if (this.for.length == 44) {
+            if (GoogleAPIversionV4) {
+              let spreadsheetID = this.for;
+              let APIkey = "AIzaSyCGmrJTJI2lNsMM22RfHUoKVhRATmNkMtM"; // from personal Google Cred
+              let tabName = "Groceries";
+              //tabName=0;
+              this.for = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetID}/values/${tabName}?alt=json&key=${APIkey}`;
+            } else
+              this.for = `https://spreadsheets.google.com/feeds/list/${this.for}/od6/public/values?alt=json`;
+          }
 
-            rows = rows.slice(headerRow, 9999).map((row) => {
-              if (isGoogle)
-                // rewrite all Google gsx$ keys to string and collect columheader titles in this.headers
-                Object.entries(row).map(([key, arr], newkey) => {
-                  // abuse idx as newkey
-                  // newkey = columnname or undefined
-                  if ((newkey = key.split("gsx$")[1])) {
-                    //console.log(key,newkey,{...row});
-                    // if we know the columnname
-                    if (this.headers[newkey]) newkey = this.headers[newkey];
-                    // store new columnname
-                    else this.headers[newkey] = newkey; // store columnname TODO translate columnname
-                    // store row[key]=value pair
-                    row[newkey] = arr.$t;
-                  }
-                  delete row[key]; // delete key from row Object
-                });
-              //console.log("headers", { headers: this.headers });
-              // now check if this record has any undefined (empty) cells
-              //Object.values(this.headers).map((key) => (row[key] ? key : (row[key] = "")));
-              return row;
-            });
-            this.load(rows);
-          } else {
-            let el =
-              this.query("#" + this.for, document) ||
-              this.query("#" + this.for, this.getRootNode().host);
-            if (el) {
-              // parse JSON from el.innerHTML
-              try {
-                this.load(JSON.parse(el.innerHTML));
-              } catch (e) {
-                console.error(e);
-              }
-            }
-            document.addEventListener(this.for, (evt) => {
-              let rows = evt.detail.rows;
-              this.load(rows);
-            }); // addEventListener
-          } // else for= string
+          this.loadJSON(this.for);
         } else {
           console.error("no for");
           return;
         }
       }); // setTimeout
     } // connectedCallback
+    async loadJSON(source) {
+      if (source.startsWith("http")) {
+        let response = await (await fetch(source)).json();
+        console.timers.push("loaded JSON");
+        let headerRow = this.getAttribute("headerrow") || 0;
+        let isGoogle = source.includes("google");
+        // find first property which is an array
+        let rows = response;
+        this.headers = {};
+        if (isGoogle) {
+          if (GoogleAPIversionV4) {
+            rows = response.values;
+            this.headers = rows.shift();
+            let newrows = rows.map((row) => {
+              let objRow = {};
+              this.headers.forEach(
+                (header, idx) => (objRow[header] = row[idx])
+              );
+              return objRow;
+            });
+            rows = [this.headers, ...newrows];
+            rows = newrows;
+          } else rows = response.feed.entry;
+        }
+        // find first property being an Array
+        if (!Array.isArray(rows)) {
+          console.warn("converting Object to Array", rows);
+          rows = [...Object.entries(rows)].reduce((rowACC, [key, value]) => {
+            if (!Array.isArray(rowACC) && Array.isArray(value)) return value;
+            else return rowACC;
+          }, rows);
+        }
+        if (!Array.isArray(rows)) {
+          console.error("No array found in response ", response);
+          return;
+        }
+        console.log(21, headerRow, this.headers, rows[1]);
+        console.do("parsed response to rows ", {
+          response,
+          rows,
+          headers: this.headers,
+        });
+
+        rows = rows.slice(headerRow, 9999).map((row) => {
+          if (isGoogle && !GoogleAPIversionV4)
+            // rewrite all Google gsx$ keys to string and collect columheader titles in this.headers
+            Object.entries(row).map(([key, arr], newkey) => {
+              // abuse idx as newkey
+              // newkey = columnname or undefined
+              if ((newkey = key.split("gsx$")[1])) {
+                //console.do(key,newkey,{...row});
+                // if we know the columnname
+                if (this.headers[newkey]) newkey = this.headers[newkey];
+                // store new columnname
+                else this.headers[newkey] = newkey; // store columnname TODO translate columnname
+                // store row[key]=value pair
+                row[newkey] = arr.$t;
+              }
+              delete row[key]; // delete key from row Object
+            });
+          //console.do("headers", { headers: this.headers });
+          // now check if this record has any undefined (empty) cells
+          //Object.values(this.headers).map((key) => (row[key] ? key : (row[key] = "")));
+          return row;
+        });
+        this.load(rows);
+      } else {
+        let el =
+          this.query("#" + source, document) ||
+          this.query("#" + source, this.getRootNode().host);
+        if (el) {
+          // parse JSON from el.innerHTML
+          try {
+            this.load(JSON.parse(el.innerHTML));
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        document.addEventListener(source, (evt) => {
+          let rows = evt.detail.rows;
+          this.load(rows);
+        }); // addEventListener
+      } // else for= string
+    }
     get show() {
       this.getAttribute("show");
     }
@@ -181,11 +289,15 @@ customElements.define(
     };
 
     //! **************************************************** convert JSON to HTML Table
+    set source(val) {
+      console.warn(val);
+    }
+    //! **************************************************** convert JSON to HTML Table
     load(json, columnDefinitions = this.querySelector("#columns")) {
       //json = json.slice(0, 3);
       console.timers.push("parsed JSON");
       if (json.headers)
-        console.warn(
+        console.do(
           "json headers",
           { headers: this.headers },
           { row0: json[0] }
@@ -203,11 +315,7 @@ customElements.define(
                 .map((x) => x.trim())
                 .join(""))
         );
-      console.log(
-        "%c config columns: ",
-        "background:purple;color:gold",
-        Object.keys(this.columns)
-      );
+      console.do("config columns: ", Object.keys(this.columns));
 
       // ==================================================
       if (json.length) {
@@ -219,7 +327,7 @@ customElements.define(
         // delete existing selected key/value?
         // if no this.headers, add keys from [0] at start of JSON array
         // if (Object.keys(this.headers || {}).length == 0) {
-        //   console.log("add first row keys as headers",json[0])
+        //   console.do("add first row keys as headers",json[0])
         //   json.unshift(Object.keys(json[0]));
         // }
 
@@ -247,6 +355,19 @@ customElements.define(
               .split`,`.concat(totalrows),
             $pagesize = this.getAttribute("pagesize") || Number($pagesizes[0]),
             $pagesizeMargin = 3, // when groupedRowCount has this count more rows, then display all
+            //doc ----------------------------------------- columns
+            $excludecolumns = (this.getAttribute("excludecolumns") || "").split(
+              ","
+            ),
+            $includecolumns = (this.getAttribute("includecolumns") || "").split(
+              ","
+            ),
+            includeColumn = (colname) => {
+              let exclude = $excludecolumns.includes(colname);
+              let include = $includecolumns.includes(colname);
+              return ($excludecolumns == "*" && include) || include || !exclude;
+            },
+            //doc ----------------------------------------- processRow
             processRow = (func) => Object.entries(row).map(func),
             // generic create TAG
             TAG = (tag, val, key, el = document.createElement(tag)) => {
@@ -274,14 +395,11 @@ customElements.define(
               TR.setAttribute("aria-roleindex", rowindex);
               TR.setAttribute("data-index", rowindex); // used in parser to find first/startRow TR rowindex
               if (rowindex == 1) {
-                console.groupCollapsed(
-                  "%c parsed columns: ➷ ",
-                  "background:purple;color:gold",
-                  { row }
-                );
+                console.do("parsed columns:");
+                console.groupCollapsed("➷", { row });
               }
               processRow(([colname, value], colnr) => {
-                // ---------------------------------------- if column has template
+                //doc ---------------------------------------- if column has template
                 if (this.columns[colname]) {
                   // if defined in <TEMPLATE id="columns"
                   // parse that innerHTML as template literal
@@ -294,19 +412,19 @@ customElements.define(
                     ...row,
                   });
                   if (rowindex == 1)
-                    console.log(
-                      `%cname: ${colname}\ninput : ${this.columns[colname]} \n%cresult: ${value}`,
-                      "background:beige",
-                      "background:lightgreen"
+                    console.do(
+                      `name: ${colname}\ninput : ${this.columns[colname]} \n result: ${value}`
                     );
                 } // if column template exists
                 // ---------------------------------------- if value not string
                 if (typeof value != "string") {
                   if (Array.isArray(value)) {
-                    subtable = document.createElement(this.localName); // <html-table>
+                    let subtable = document.createElement(this.localName); // <html-table>
                     subtable.json = value;
-                    valueIsTable = true;
+                    // valueIsTable = true;
                     value = subtable;
+                  } else if (typeof value == "number") {
+                    value = Number(value);
                   } else {
                     value = typeof value;
                   }
@@ -360,12 +478,12 @@ customElements.define(
                 // ---------------------------------------- built <option> for TH.grouped
                 let option;
                 let columnValuesMap = TM.columns.get(columnname);
+                TH.colname = columnname; // used by sort
                 TH.id = this.id + "_" + columnname;
                 //DELTH.groupbyselect = GROUPSELECT;
                 TH.append(THSTYLE, RESIZEDIV);
-                //DELTH.header = THHEADER; //! point to header <DIV> So sorted can find it
+                TH.header = THHEADER; //! point to header <DIV> So sorted can find it
                 // ---------------------------------------- //! keep track of all headers by columnname
-                TM.THns[columnname] = TH; // store columns by names, only used in TH function
                 TM.THs.push(TH);
                 TM.groupby.push(GROUPSELECT);
                 // ---------------------------------------- // aria
@@ -517,76 +635,30 @@ customElements.define(
                   //! pager *replaces* OPTION DOM elements so set value after all is done
                   GROUPSELECT.value = groupValue;
                 };
-                // ---------------------------------------- sort column ###
-                THHEADER.onclick = (evt) => TH.sort();
+                //doc ---------------------------------------- sort column ###
                 TH.sorted = 0; //1 asc 2 desc 0
                 TH.sort = (
-                  state = ++TH.sorted, //increase sort state
-                  callPager = true,
-                  // on first sort capture TRs, else use current sort TR
-                  currentTR = [...TM.tbody.querySelectorAll("tr")]
+                  state = ++TH.sorted, // inc. 0,1,2 when not specified
+                  singleColumnSort = 1 // ctrl key sorts multiple columns
                 ) => {
-                  // TM.sort=[] is array of TH in sort order
-                  log(
-                    "sort state:",
-                    state,
-                    "len:",
-                    currentTR.length,
-                    { currentTR },
-                    TM.sort
+                  if (state > 2) TH.sorted = 0; // 0,1,2
+                  if (singleColumnSort) {
+                    // ctrl click sorts on multiple columns
+                    TM.THs.map((THc) => TH != THc && (THc.sorted = 0)); // reset all columns
+                  }
+                  startRow = 1; // every sort resets page position
+                  TM.pager(); // update page state
+                };
+                THHEADER.onclick = (evt) =>
+                  TH.sort(
+                    ++TH.sorted, // increase 0,1,2 sort state
+                    !evt.ctrlKey // send ctrl key, sorts multiple columns
                   );
 
-                  // remove sort from sortedTH
-                  // if (TM.sorted != TH) {
-                  //   TM.sorted.sorted = 0;
-                  //   TM.sorted.header.removeAttribute("data-sort");
-                  // }
-                  // TM.sorted = TH; // REFACTOR
-                  //
-                  _unsorted = _unsorted || [...currentTR]; // maintain original sort order copy
-                  if (state == 3) {
-                    TH.sorted = 0;
-                    TM.sort = TM.sort.filter((x) => X.sorted); // remove all non-sorted columns
-                  }
-                  THHEADER.setAttribute("data-sort", " ▲▼"[TH.sorted]);
-
-                  if (TH.sorted) {
-                    TM.sortTHs.add(TH);
-                    let sortedTR = currentTR.sort(
-                      // then sort column with value helper function to get row.columnname
-                      (
-                        x,
-                        y,
-                        value = (TRxy) => (
-                          log(columnname, TRxy.row[columnname]),
-                          TRxy.row[columnname]
-                        )
-                      ) =>
-                        TH.isNumber
-                          ? // sort by Number value
-                            Number(value(state == 2 ? y : x)) -
-                            Number(value(state == 2 ? x : y))
-                          : // sort by String value
-                            value(state == 2 ? y : x).localeCompare(
-                              value(state == 2 ? x : y),
-                              "en"
-                            )
-                    );
-                    sortedTR.map((TR) => console.log(TR.row.Cors));
-                    TM.tbody.innerHTML = "";
-                    TM.tbody.replaceChildren(...sortedTR);
-                  } else {
-                    TM.sortTHs.delete(TH);
-                    TM.tbody.replaceChildren(..._unsorted);
-                  }
-
-                  // TODO don't update page when currentTR are re-sorted
-                  if (callPager) TM.pager(); // update page state
-                }; // TH.sort function
-
-                //! ---------------------------------------- end TH
+                //doc ---------------------------------------- end TH
               }); // end processRow() function call
 
+              //doc ---------------------------------------- init pager()
               let startRow = this.getAttribute("rowindex") || 1; // reset by TM.pager()
               let pageTAG = (
                 arrow,
@@ -639,25 +711,24 @@ customElements.define(
               TM.table.setAttribute("role", "table");
               TM.table.style.tableLayout = "fixed"; // TODO move, do only once? or toggle some value?
 
-              // ---------------------------------------- #pager Function
+              //doc ---------------------------------------- #pager Function
               TM.pager = (first = startRow, size = $pagesize) => {
                 // process TM.grouped values keep all rows with grouped values
-                let groupedColumnnames = Object.keys(TM.grouped);
                 TM.selected = TM.TRs.filter(
                   // filter all TRs
                   (TR) =>
-                    groupedColumnnames // get filtered columnnames
+                    Object.keys(TM.grouped) // get filtered columnnames
                       .map((colname) => TR.row[colname] == TM.grouped[colname]) // T/F
                       .every((x) => x) // all True
                 );
-                let groupedRowCount = groupedColumnnames.length
+                let groupedRowCount = Object.keys(TM.grouped).length
                   ? TM.selected.length
                   : 0;
                 if (typeof first == "string" && first.includes("groupby")) {
                   first = 1;
                   if (!TM.selected.length) console.error("no TR", TM.grouped); // TODO no selection warning
                 }
-                // ---------------------------------------- set pager pagesize
+                //doc ---------------------------------------- set pager pagesize
                 first = startRow = Number(first);
                 size = Number(size);
                 if (first < 1) first = 1;
@@ -670,7 +741,7 @@ customElements.define(
                 } else {
                   // display paged selected rows
                   if (first > totalrows) first = totalrows - $pagesize;
-                  // ---------------------------------------- show/hide pager <b>uttons
+                  //doc ---------------------------------------- show/hide pager <b>uttons
                   PAGERSTYLE.innerHTML = `${
                     first + $pagesize < totalrows
                       ? first == 1
@@ -680,12 +751,43 @@ customElements.define(
                   }`;
                   // ---------------------------------------- update TR
                 }
+                //doc --------------------------------------- sort by columns
+                let sortColumns = TM.THs.filter((TH) => TH.sorted);
+                let getRowValue = (TH, TRxy) =>
+                  sortColumns.map((TH) =>
+                    TH.isNumber
+                      ? String(TRxy.row[TH.colname]).padStart(10, "0") // pad numbers to correct sort String
+                      : TRxy.row[TH.colname]
+                  ).join``;
+                sortColumns.map((TH) =>
+                  TM.selected.sort(
+                    (
+                      x, // first item for sort
+                      y // second item for sort
+                    ) =>
+                      TH.isNumber
+                        ? // sort by Number value
+                          Number(getRowValue(TH, TH.sorted == 2 ? y : x)) -
+                          Number(getRowValue(TH, TH.sorted == 2 ? x : y))
+                        : // sort by String value
+                          getRowValue(TH, TH.sorted == 2 ? y : x).localeCompare(
+                            getRowValue(TH, TH.sorted == 2 ? x : y)
+                            //optional Locale "en" // TODO give user a hook
+                          )
+                  )
+                );
+
+                TM.THs.map((TH) =>
+                  TH.sorted
+                    ? TH.header.setAttribute("data-sort", "▲▼"[TH.sorted - 1]) //todo User configurable
+                    : TH.header.removeAttribute("data-sort")
+                );
+                //! --------------------------------------- trim TM.selected to pagesize
                 TM.selected = TM.selected.slice(
                   startRow - 1,
                   startRow + $pagesize - 1
                 );
-                log($pagesize, size, TM.selected.length);
-                console.warn(
+                console.do(
                   "pager",
                   "ps:",
                   $pagesize,
@@ -695,25 +797,21 @@ customElements.define(
                   "grc",
                   groupedRowCount
                 );
-                log("sort columns", TM.sortTHs);
-                //!! recursive !!
-                // TODO pass TM.selected to sort function
-                [...TM.sortTHs.values()].map((TH) => TH.sort(TH.sorted, 0)); //0 don't call pager in sort
-                //! replace all TRs
+                //! --------------------------------------- replace all TRs
                 TM.tbody.replaceChildren(...TM.selected);
-                //! set pager data
+                //! --------------------------------------- set pager data
                 PAGESIZESPAN.innerHTML =
                   `<span id=pages><button>1</button> [prevpages] ${first} ⎯ ${
                     first + TM.selected.length - 1
                   } [nextpages] /</span> ${totalrows} ` +
                   (groupedRowCount ? ` ⭃ ` + groupedRowCount : ``);
 
-                //! update all TH, resize <select> to show all inclusions
+                //! --------------------------------------- update all TH, resize <select> to show all inclusions
                 let highest = TM.THs.reduce((highest, TH) => {
                   TH.update(true); // update to new <optgroup> state
                   let count =
                     TH.querySelector("optgroup")?.children.length || 1;
-                  //console.log(TH.id, count);
+                  //console.do(TH.id, count);
                   if (highest > count) return highest;
                   return count;
                 }, 1); // update in/out selection for all TH
@@ -725,6 +823,7 @@ customElements.define(
                         : 11 // to a max of 11
                       : 1) // else show 1 row select
                 );
+                this.savestate();
               }; // TM.pager() function
               // end #pager ---------------------------------------- built #pager
             } // end else (rownr==0) TH creator
@@ -740,16 +839,13 @@ customElements.define(
             selected: [],
             //TODO TR: (x)=> find row by x
             THs: [],
-            THns: {}, // all Columns by name
-            sortTHs: new Set(), // array of TH in sort order
-
             // Find a TH columns - 3 ways to get TH : TH,number,columname
             TH: (x) =>
               typeof x == "object"
                 ? x // x is TH
                 : typeof x == "number"
                 ? this.$table.THs[x] // x is number
-                : this.$table.THns[x], // x is string,
+                : this.$table.THs.filter((TH) => TH.colname == x)[0], // x is string,
             table: document.createElement("table"),
             thead: document.createElement("thead"),
             tbody: document.createElement("tbody"),
@@ -766,17 +862,48 @@ customElements.define(
         //this.$table.TH("department")?.groupby("pasta");
         //this.$table.TH("Category")?.groupby("Anti-Malware");
         //this.$table.TH("Category")?.groupby("*");
-        this.$table.pager(this.getAttribute("rownr") || 1);
-        this.$table.TH("Cors")?.sort();
+        //this.$table.pager(this.getAttribute("rownr") || 1);
+        this.$table.TH("naam")?.sort();
+
+        //! Sort AH shopping list
+        this.$table.TH("Order")?.sort();
+        this.$table.TH("Buy")?.groupby("TRUE");
+
+        //sort:["colname"]
+        this.loadstate();
+        this.$table.pager(1, 30);
         console.timers.push("first TABLE page*");
       } // if(json.length)
     } //load(json)
 
-    filter(colname, val) {}
+    savestate() {
+      console.do("Save state");
+      localStorage.setItem(
+        btoa(this.for),
+        JSON.stringify({
+          sorted: this.$table.THs.map((TH) => [TH.colname, TH.sorted]),
+          grouped: this.$table.grouped,
+        })
+      );
+      //! don't ! callstack error      this.loadstate();
+    }
+    loadstate(saved = JSON.parse(localStorage.getItem(btoa(this.for)))) {
+      if (saved) {
+        Object.keys(saved.grouped).map((colname) =>
+          this.$table.TH(colname).groupby(saved.grouped[colname])
+        );
+        console.log(this.$table);
+        saved.sorted.map(([colname, sorted]) => {
+          if (this.$table.TH(colname)?.sorted)
+            this.$table.TH(colname).sorted = sorted;
+        });
+      }
+    }
     sort(
       input = this.getAttribute("sort"),
       TH = this.$table.TH(input) // get TH 3 ways:: columnNr, string or TH
     ) {
+      console.error("SORT");
       TH && TH.sort(); //
     } // sort()
   } //define
@@ -784,4 +911,3 @@ customElements.define(
 
 // using <file-size> Web Component for Dev.to post
 //import {} from "https://file-size.github.io/element.js";
-

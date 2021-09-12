@@ -21,8 +21,12 @@
       content="width=device-width, initial-scale=1"
     />
 
-    <script defer="" src="./element.js"></script>
-  </head>
+    <script type="module">
+      console.log(21);
+      import(`./element${location.host.includes("github")?"":".source"}.js`);
+  </script>
+  
+    </head>
   <body>
     <template id="HTML-TABLE-STYLE">
       <style>
@@ -36,7 +40,8 @@
           --tableHeadBackground: var(--tableBackground);
           --hoverColor: darkgray;
           --selectedColor: lightgreen;
-          --filterColor: lightgreen;
+          --filterColor: gold;
+          --tableSortColor:gold;
           border-spacing: 1px 0;
           background: var(--tableBackground, darkgrey);
         }
@@ -115,11 +120,14 @@
         tbody tr:nth-child(odd) {
           background-color: bisque;
         }
+        th [data-sort]{
+
+          color:var(--tableSortColor);
+        }
         th [data-sort]::after {
           position: absolute;
           content: attr(data-sort);
           font-weight: bold;
-          color: black;
         }
 
         td[data-isnumber="true"] {
@@ -152,22 +160,35 @@
           background: green;
           color: white;
         }
+
       </style>
     </template>
+    <select onchange="document.querySelector('html-table').source=this.value;">
+      <option selected value="https://spreadsheets.google.com/feeds/list/1PtHV1xkRFAgi7T7TdeKy8yJV9yhEvyNYYUwESGM7Tp8/od6/public/values?alt=json">AH Boodschappen</option>
+      <option></option>
+    </select>
+    <google-sheet id="WeeklyShopping"
+                  sheetid="1PtHV1xkRFAgi7T7TdeKy8yJV9yhEvyNYYUwESGM7Tp8" 
+                  sheettab="Boodschappen" 
+                  apikey="AIzaSyCGmrJTJI2lNsMM22RfHUoKVhRATmNkMtM"></google-sheet>
     <html-table
       timers
       id="MYTABLE"
       forR="R"
+      for="1PtHV1xkRFAgi7T7TdeKy8yJV9yhEvyNYYUwESGM7Tp8"
+      for_roads="1vbtRB3MwAkIIemJ108YxRIehe-Fja6irxCcH1HoGwOY"
       for1="https://spreadsheets.google.com/feeds/list/15VqF0EBeBe3ahC92Laq0rp2bgbZBd9abR56XbzBwdJo/od6/public/values?alt=json"
-      for2="https://spreadsheets.google.com/feeds/list/1PtHV1xkRFAgi7T7TdeKy8yJV9yhEvyNYYUwESGM7Tp8/od6/public/values?alt=json"
-      for="https://api.publicapis.org/entries"
+      for1="https://api.publicapis.org/entries"
       for1="https://restcountries.eu/rest/v2/all"
+      for="https://css-tricks.com/wp-json/wp/v2/posts?per_page=12&_embed"
       json="json/entries"
       filter="o"
       headerrow1="1"
       sort="jaar1"
       pagesizes="5,10,20,30,40"
       pagesize="5"
+      excludecolumns="*"
+      includecolumns="link,title,content"
       xxxrownr="3"
     >
       <template id="columns">
@@ -192,6 +213,24 @@
         td[data-colname="sort"] {
           font-size: 80%;
         }
+
+        @media print {    
+          
+          [data-colname]{
+            font-size:160%;
+          }
+
+         [data-colname="Article"]{
+            width:50em;
+         }
+         [data-colname="sel"],
+         [data-colname="Buy"],
+         select,
+         .columnfilter,
+         tfoot {
+          display:none        
+        }
+    }
 
         [data-colindex="2"] {
           background: rgb(128, 128, 128, 0.5);
@@ -231,5 +270,14 @@
       "done":false },{ "todo":"Two", "done":false },{ "todo":"Three",
       "done":false }]
     </template>
+    <html-list for="">
+      <!-- create template for every for list-item -->
+      <template>
+        <style>
+          /*  */
+        </style>
+      </template>
+    </html-list>
+    <!-- <iframe width="100%" height="800px" src="https://docs.google.com/spreadsheets/d/1PtHV1xkRFAgi7T7TdeKy8yJV9yhEvyNYYUwESGM7Tp8/edit#gid=0"></iframe> -->
   </body>
 </html>
