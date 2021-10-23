@@ -1,7 +1,8 @@
 .vscode
+NOTES.TXT
 build
 node_modules
 yarn.lock
 node_modules/.yarn-integrity
-element.js.gz
+*.gz
 .gitignore
