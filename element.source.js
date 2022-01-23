@@ -198,9 +198,7 @@ customElements.define(
             let newrows = rows.map((row) => {
               let objRow = {};
               this.headers.forEach((header, idx) => {
-                let value = row[idx];
-                if (header == "Order") row[idx] = String(value).padStart(3, "0");
-                console.error(idx, header, row[idx]);
+                if (header == "Order") row[idx] = String(row[idx]).padStart(3, "0");
                 objRow[header] = row[idx];
               });
               return objRow;
