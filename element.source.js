@@ -44,6 +44,7 @@ customElements.define(
   "google-sheet",
   class extends HTMLElement {
     constructor() {
+      super();
       this._headers = false;
       this._rows = false;
     }
@@ -196,9 +197,12 @@ customElements.define(
             this.headers = rows.shift();
             let newrows = rows.map((row) => {
               let objRow = {};
-              this.headers.forEach(
-                (header, idx) => (objRow[header] = row[idx])
-              );
+              this.headers.forEach((header, idx) => {
+                let value = row[idx];
+                if (header == "Order") row[idx] = String(value).padStart(3, "0");
+                console.error(idx, header, row[idx]);
+                objRow[header] = row[idx];
+              });
               return objRow;
             });
             rows = [this.headers, ...newrows];
