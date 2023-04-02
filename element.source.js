@@ -873,7 +873,7 @@ customElements.define(
 
         //sort:["colname"]
         this.loadstate();
-        this.$table.pager(1, 30);
+        this.$table.pager(1, 40);
         console.timers.push("first TABLE page*");
       } // if(json.length)
     } //load(json)
